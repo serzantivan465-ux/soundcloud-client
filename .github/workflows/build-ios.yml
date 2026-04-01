@@ -1,36 +1,59 @@
 name: Build iOS IPA
+
 on:
   push:
     branches: [master]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
       - name: Install dependencies
         run: npm ci
+
       - name: Prebuild iOS
         run: npx expo prebuild --platform ios --clean
+
+      - name: Debug - list ios dir
+        run: ls -la ios/
+
+      - name: Install CocoaPods
+        run: cd ios && pod install && cd ..
+
+      - name: Find workspace and scheme
+        run: |
+          echo "=== Workspaces ==="
+          find ios -name "*.xcworkspace" -type d
+          echo "=== Schemes ==="
+          xcodebuild -list -workspace ios/*.xcworkspace 2>/dev/null || xcodebuild -list -project ios/*.xcodeproj 2>/dev/null
+
       - name: Build archive
         run: |
-          cd ios
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -type d | head -1)
+          if [ -z "$WORKSPACE" ]; then
+            echo "No xcworkspace found!"
+            exit 1
+          fi
           xcodebuild archive \
-            -workspace soundcloud-client.xcworkspace \
+            -workspace "$WORKSPACE" \
             -scheme soundcloud-client \
             -configuration Release \
-            -archivePath build/soundcloud-client.xcarchive \
+            -archivePath ios/build/soundcloud-client.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
+
       - name: Export IPA
         run: |
-          cd ios
-          cat > ExportOptions.plist << 'PLIST'
+          cat > ios/ExportOptions.plist << 'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -43,10 +66,11 @@ jobs:
           </plist>
           PLIST
           xcodebuild -exportArchive \
-            -archivePath build/soundcloud-client.xcarchive \
-            -exportPath build/output \
-            -exportOptionsPlist ExportOptions.plist \
+            -archivePath ios/build/soundcloud-client.xcarchive \
+            -exportPath ios/build/output \
+            -exportOptionsPlist ios/ExportOptions.plist \
             CODE_SIGNING_ALLOWED=NO
+
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
