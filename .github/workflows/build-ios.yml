@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -20,21 +20,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+
       - name: Prebuild iOS
         run: npx expo prebuild --platform ios --clean
-
-      - name: Debug - list ios dir
-        run: ls -la ios/
-
-      - name: Install CocoaPods
-        run: cd ios && pod install && cd ..
-
-      - name: Find workspace and scheme
-        run: |
-          echo "=== Workspaces ==="
-          find ios -name "*.xcworkspace" -type d
-          echo "=== Schemes ==="
-          xcodebuild -list -workspace ios/*.xcworkspace 2>/dev/null || xcodebuild -list -project ios/*.xcodeproj 2>/dev/null
 
       - name: Build archive
         run: |
