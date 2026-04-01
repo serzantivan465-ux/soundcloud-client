@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -20,50 +20,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
-
-      - name: Prebuild iOS
-        run: npx expo prebuild --platform ios --clean
-
-      - name: Build archive
-        run: |
-          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -type d | head -1)
-          if [ -z "$WORKSPACE" ]; then
-            echo "No xcworkspace found!"
-            exit 1
-          fi
-          xcodebuild archive \
-            -workspace "$WORKSPACE" \
-            -scheme soundcloud-client \
-            -configuration Release \
-            -archivePath ios/build/soundcloud-client.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
-
-      - name: Export IPA
-        run: |
-          cat > ios/ExportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          PLIST
-          xcodebuild -exportArchive \
-            -archivePath ios/build/soundcloud-client.xcarchive \
-            -exportPath ios/build/output \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
         with:
-          name: soundcloud-client
-          path: ios/build/output/*.ipa
-          retention-days: 7
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build with EAS
+        run: eas build --platform ios --profile preview --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
